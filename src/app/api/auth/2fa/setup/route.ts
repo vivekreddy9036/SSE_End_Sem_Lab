@@ -9,8 +9,6 @@ import {
   generateTotpUri,
   encryptTotpSecret,
   decryptTotpSecret,
-  verifyTotpToken,
-  generateRecoveryCodes,
 } from "@/lib/totp";
 import { auditLog, getClientIpFromRequest } from "@/lib/audit";
 

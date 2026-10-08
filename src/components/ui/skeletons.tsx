@@ -37,50 +37,6 @@ export function SkeletonKpiRow({ count = 4 }: { count?: number }) {
   );
 }
 
-type ChartShape = "donut" | "bars" | "area" | "radar";
-
-const BAR_HEIGHTS = [55, 85, 40, 95, 65, 35];
-
-export function SkeletonChartCard({
-  shape = "bars",
-  delay = 0,
-  height = 240,
-}: {
-  shape?: ChartShape;
-  delay?: number;
-  height?: number;
-}) {
-  return (
-    <Card className="animate-in fade-in duration-500" style={stagger(delay)}>
-      <CardHeader>
-        <Skeleton className="h-5 w-40 mb-2" />
-        <Skeleton className="h-4 w-28" />
-      </CardHeader>
-      <CardContent className="flex items-center justify-center" style={{ height }}>
-        {(shape === "donut" || shape === "radar") && (
-          <Skeleton className="h-[75%] aspect-square rounded-full" />
-        )}
-        {shape === "bars" && (
-          <div className="flex items-end gap-3 h-full w-full px-2 pb-2">
-            {BAR_HEIGHTS.map((h, i) => (
-              <Skeleton
-                key={i}
-                className="flex-1 rounded-t-md"
-                style={{ height: `${h}%`, ...stagger(i, 80) }}
-              />
-            ))}
-          </div>
-        )}
-        {shape === "area" && (
-          <div className="w-full h-full flex items-end">
-            <Skeleton className="w-full h-2/3 rounded-lg" />
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 export function SkeletonTable({ rows = 8, cols = 6 }: { rows?: number; cols?: number }) {
   return (
     <div>

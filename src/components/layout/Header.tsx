@@ -5,8 +5,14 @@ import { useTheme } from "next-themes";
 import { useAuth } from "@/components/AuthProvider";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { MapPin, Moon, Sun } from "lucide-react";
-import NotificationBell from "@/components/layout/NotificationBell";
+import { MapPin, Moon, Sun, ShieldCheck } from "lucide-react";
+
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Administrator",
+  APPROVER: "Approver",
+  AUDITOR: "Auditor",
+  USER: "Standard User",
+};
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -40,17 +46,9 @@ export default function Header() {
       <SidebarTrigger className="text-white hover:bg-white/20 hover:text-white" />
       <Separator orientation="vertical" className="h-5 bg-white/30" />
       <div className="flex flex-1 items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img
-            src="/coats_icon_header.png"
-            alt="CoATS"
-            className="h-9 w-auto object-contain"
-          />
-          <img
-            src="/coats_header_beside.png"
-            alt=""
-            className="h-7 w-auto object-contain hidden sm:block"
-          />
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-6 w-6" strokeWidth={2} />
+          <span className="font-semibold tracking-tight hidden sm:inline">SentinelIAM</span>
         </div>
 
         {user && (
@@ -58,7 +56,7 @@ export default function Header() {
             <div className="hidden md:flex flex-col items-end text-sm">
               <span className="font-medium">{user.fullName}</span>
               <span className="text-xs text-white/70">
-                {user.isSupervisory ? "Supervisory Officer" : "Case Holding Officer"} — {user.branchCode}
+                {ROLE_LABELS[user.roleCode] ?? user.roleCode}
               </span>
               {user.lastLoginLocation && (
                 <span className="text-xs text-white/50 flex items-center gap-1">
@@ -67,7 +65,6 @@ export default function Header() {
                 </span>
               )}
             </div>
-            <NotificationBell />
             <ThemeToggle />
             <button
               onClick={logout}

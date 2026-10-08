@@ -430,7 +430,7 @@ export default function TwoFactorPage() {
             disabled={!recoveryCodesSaved}
             className="w-full h-11 bg-navy hover:bg-navy-light text-white font-medium"
           >
-            Continue to CoATS
+            Continue to SentinelIAM
           </Button>
         </>
       )}

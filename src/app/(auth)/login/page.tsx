@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import Script from "next/script";
+import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,7 @@ declare global {
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,7 +44,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(username.trim(), password, turnstileToken);
+      await login(email.trim().toLowerCase(), password, turnstileToken);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
       // Reset Turnstile so user can get a fresh token
@@ -63,12 +64,9 @@ export default function LoginPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-navy-dark to-navy p-4">
         <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-2 duration-500">
         {/* Header */}
-        <div className="flex justify-center mb-1">
-          <img
-            src="/coats_login.png"
-            alt="CoATS — Cases of Anti Terrorism Squad"
-            className="w-72 object-contain drop-shadow-lg"
-          />
+        <div className="flex flex-col items-center gap-2 mb-4 text-white">
+          <ShieldCheck className="w-14 h-14 drop-shadow-lg" strokeWidth={1.75} />
+          <span className="text-2xl font-semibold tracking-tight">SentinelIAM</span>
         </div>
 
         {/* Login Card */}
@@ -85,13 +83,13 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
-              <Label htmlFor="username">User ID</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. SP ATS HQ"
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@sentineliam.test"
                 className="h-11 px-4 focus-visible:border-navy focus-visible:ring-navy/30 dark:focus-visible:border-blue-400 dark:focus-visible:ring-blue-400/30"
                 required
                 autoFocus
@@ -99,7 +97,12 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-navy dark:hover:text-blue-400">
+                  Forgot password?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -138,11 +141,18 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            Need an account?{" "}
+            <Link href="/register" className="text-navy dark:text-blue-400 font-medium hover:underline">
+              Register
+            </Link>
+          </p>
         </div>
 
         <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400 mt-6">
           <ShieldCheck className="w-3.5 h-3.5" strokeWidth={2} />
-          <p>Secure Access — Anti Terrorism Squad, Government of Tamil Nadu</p>
+          <p>Secure Access — Identity &amp; Access Management Platform</p>
         </div>
       </div>
     </div>

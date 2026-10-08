@@ -29,11 +29,29 @@ const PUBLIC_ROUTES = [
   "/two-factor",
 ];
 
-// Page/API routes reserved for Administrators only. Fine-grained permission
-// checks (e.g. "do you hold PAYROLL_APPROVE") happen server-side in the route
-// handlers via src/lib/authz.ts — this is just a coarse edge-level gate so an
-// unauthenticated or non-admin user never even renders the admin shell.
-const ADMIN_PREFIXES = ["/admin", "/api/admin"];
+// Identity-structure admin routes: only ADMIN manages users/roles/permissions/
+// resources themselves (separate from being able to use what they grant).
+const ADMIN_ONLY_PREFIXES = [
+  "/admin/users",
+  "/api/admin/users",
+  "/admin/roles",
+  "/api/admin/roles",
+  "/admin/permissions",
+  "/api/admin/permissions",
+  "/admin/resources",
+  "/api/admin/resources",
+];
+
+// Approval queue: anyone holding an APPROVE/MANAGE permission on at least one
+// resource, not just Administrators — separation of duties between identity
+// administration and business-resource ownership. This is a coarse edge
+// check against the JWT's cached permission list; the actual per-request
+// approval still gets re-verified live against the DB in the route handler
+// (src/lib/authz.ts assertCanApprove) since the JWT can be up to 15m stale.
+const APPROVAL_PREFIXES = ["/admin/access-requests", "/api/admin/access-requests"];
+
+// Audit log: ADMIN and AUDITOR roles both hold AUDIT_LOG_READ by default.
+const AUDIT_PREFIXES = ["/admin/audit-log", "/api/admin/audit-log"];
 
 // ── Middleware ───────────────────────────────────────
 
@@ -71,17 +89,22 @@ export async function middleware(req: NextRequest) {
     return handleUnauthorized(req, pathname);
   }
 
-  // 5. RBAC: Admin-only routes
-  if (ADMIN_PREFIXES.some((p) => pathname.startsWith(p))) {
-    if (payload.roleCode !== "ADMIN") {
-      if (pathname.startsWith("/api/")) {
-        return NextResponse.json(
-          { success: false, message: "Forbidden — Administrator access required" },
-          { status: 403 }
-        );
-      }
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+  // 5. RBAC: edge-level gates (route handlers re-verify against the DB)
+  const permissions = payload.permissions ?? [];
+  const isForbidden =
+    (ADMIN_ONLY_PREFIXES.some((p) => pathname.startsWith(p)) && payload.roleCode !== "ADMIN") ||
+    (APPROVAL_PREFIXES.some((p) => pathname.startsWith(p)) &&
+      !permissions.some((code) => code.endsWith("_APPROVE") || code.endsWith("_MANAGE"))) ||
+    (AUDIT_PREFIXES.some((p) => pathname.startsWith(p)) && !permissions.includes("AUDIT_LOG_READ"));
+
+  if (isForbidden) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { success: false, message: "Forbidden" },
+        { status: 403 }
+      );
     }
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
   // 6. Add user info to request headers (available to API routes)

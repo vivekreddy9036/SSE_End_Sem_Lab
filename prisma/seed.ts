@@ -92,6 +92,11 @@ async function main() {
   });
 
   // ─── Role → Permission mapping (admin-defined baseline) ────────────────
+  // APPROVER and USER intentionally get nothing at the role level: "being an
+  // Approver" grants no authority by itself in this model — approval rights
+  // are scoped per-resource via direct UserPermission grants below, the
+  // same mechanism an approved AccessRequest uses. Only ADMIN and AUDITOR
+  // have a flat, role-wide baseline since their scope genuinely is global.
   const grant = async (roleId: number, permissionId: number) =>
     prisma.rolePermission.upsert({
       where: { roleId_permissionId: { roleId, permissionId } },
@@ -104,10 +109,6 @@ async function main() {
     grant(admin.id, adminConsoleAdmin.id),
     grant(admin.id, auditLogRead.id),
     grant(auditor.id, auditLogRead.id),
-    grant(approver.id, hrApprove.id),
-    grant(approver.id, payrollApprove.id),
-    grant(approver.id, devopsApprove.id),
-    // USER role intentionally gets nothing by default — must request access.
   ]);
   console.log("✓ baseline role→permission grants created");
 
@@ -119,7 +120,7 @@ async function main() {
       create: { email, passwordHash, fullName, roleId },
     });
 
-  const [, , , alice, bob] = await Promise.all([
+  const [approverHr, approverOps, , alice, bob] = await Promise.all([
     upsertUser("approver.hr@sentineliam.test", "Priya Approver (HR/Payroll)", approver.id),
     upsertUser("approver.ops@sentineliam.test", "Raj Approver (DevOps)", approver.id),
     upsertUser("auditor@sentineliam.test", "Meena Auditor", auditor.id),
@@ -129,30 +130,49 @@ async function main() {
   ]);
   console.log("✓ 6 additional users created (2 approvers, 1 auditor, 3 standard users)");
 
+  // ─── Direct per-user grants: scope each approver to their own resources ──
+  const directGrant = async (userId: number, permissionId: number) =>
+    prisma.userPermission.upsert({
+      where: { userId_permissionId: { userId, permissionId } },
+      update: {},
+      create: { userId, permissionId, grantedById: adminUser.id },
+    });
+
+  await Promise.all([
+    directGrant(approverHr.id, hrApprove.id),
+    directGrant(approverHr.id, payrollApprove.id),
+    directGrant(approverOps.id, devopsApprove.id),
+  ]);
+  console.log("✓ scoped approver grants created");
+
   // ─── Sample access requests (demo data for the approval workflow) ──────
-  await prisma.accessRequest.upsert({
-    where: { id: 1 },
-    update: {},
-    create: {
-      id: 1,
-      requesterId: alice.id,
-      permissionId: payrollRead.id,
-      justification: "Need read access to payroll to reconcile Q1 reimbursements.",
-      status: "PENDING",
-    },
+  // No hardcoded ids here: an explicit id on an autoincrement PK doesn't
+  // advance Postgres's sequence, so the next real create() collides with it.
+  // Idempotency instead comes from checking whether seed data already exists.
+  const existingSampleRequests = await prisma.accessRequest.count({
+    where: { requesterId: { in: [alice.id, bob.id] } },
   });
-  await prisma.accessRequest.upsert({
-    where: { id: 2 },
-    update: {},
-    create: {
-      id: 2,
-      requesterId: bob.id,
-      permissionId: hrRead.id,
-      justification: "Onboarding new hires requires read access to HR Portal.",
-      status: "PENDING",
-    },
-  });
-  console.log("✓ 2 sample access requests created");
+  if (existingSampleRequests === 0) {
+    await prisma.accessRequest.createMany({
+      data: [
+        {
+          requesterId: alice.id,
+          permissionId: payrollRead.id,
+          justification: "Need read access to payroll to reconcile Q1 reimbursements.",
+          status: "PENDING",
+        },
+        {
+          requesterId: bob.id,
+          permissionId: hrRead.id,
+          justification: "Onboarding new hires requires read access to HR Portal.",
+          status: "PENDING",
+        },
+      ],
+    });
+    console.log("✓ 2 sample access requests created");
+  } else {
+    console.log("✓ sample access requests already present, skipped");
+  }
 
   const totalUsers = 1 + 6;
   console.log(`\n✅ Seeding complete! Total: ${totalUsers} users`);

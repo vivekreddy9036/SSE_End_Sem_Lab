@@ -1,11 +1,8 @@
 <div align="center">
 
-<img src="./public/coats_login.png" alt="CoATS" width="400" />
+# SentinelIAM
 
-<br/>
-
-# CoATS V2
-### Complaint Administration & Tracking System
+### Identity & Access Management Platform
 
 <br/>
 
@@ -17,25 +14,26 @@
 
 <br/>
 
-> A secure, modern platform for law enforcement to register, manage, and track criminal complaints across branches.
+> A simplified Identity and Access Management platform: registration, login, role assignment, permission management, password reset, access requests, access approval, and account deactivation — behind strong multi-factor authentication.
 
 </div>
 
 ---
 
-## What is CoATS?
+## What is SentinelIAM?
 
-CoATS replaces manual, paper-based case tracking in law enforcement departments with a fast and auditable digital system. Officers manage their own branch cases while supervisors get a birds-eye view across all branches — all behind strong multi-factor authentication.
+SentinelIAM lets administrators define who can do what: `User → Role → Permission → Resource`. Users register, authenticate with MFA, and request access to protected resources; designated approvers review those requests; every security-relevant action is written to an audit trail.
 
 ---
 
 ## Features
 
-- **Case Management** — Register complaints, track stages, log progress, and manage action items
-- **Role-Based Access** — Officers see their branch; supervisors see everything
-- **Analytics Dashboard** — Visual charts showing case distribution by stage and branch
+- **User Lifecycle** — Self-service registration, password reset, account deactivation/reactivation
+- **Role-Based Access Control** — Administrators define Roles, Permissions, and the Resources they protect
+- **Access Requests** — Users request access with a justification; approvers scoped to their own resources review it
 - **Multi-Factor Auth** — Password + TOTP (Google Authenticator) or Passkey (Face ID / fingerprint)
-- **Audit Trail** — Every login and security event is logged with timestamp and IP
+- **Audit Trail** — Every login, role change, permission grant, and access decision is logged with timestamp and IP
+- **Privilege-Escalation Guards** — Role assignment and access approval are re-verified server-side against live DB state, not just a cached JWT claim
 
 ---
 
@@ -70,7 +68,7 @@ JWT_SECRET="your-secret-key"
 WEBAUTHN_RP_ID="localhost"
 WEBAUTHN_ORIGIN="http://localhost:3000"
 TOTP_ENCRYPTION_KEY="your-32-byte-hex-key"
-NEXT_PUBLIC_APP_NAME="CoATS"
+NEXT_PUBLIC_APP_NAME="SentinelIAM"
 ```
 
 ---
@@ -90,18 +88,10 @@ NEXT_PUBLIC_APP_NAME="CoATS"
 
 ## Tech Stack
 
-Next.js 16 · React 19 · TypeScript · Tailwind CSS · Prisma · PostgreSQL · shadcn/ui · Recharts · WebAuthn · TOTP · JWT
+Next.js 16 · React 19 · TypeScript · Tailwind CSS · Prisma · PostgreSQL · shadcn/ui · WebAuthn · TOTP · JWT · Zod
 
 ---
 
 ## License
 
 MIT — see [LICENSE](./LICENSE) for details.
-
-<br/>
-
-<div align="center">
-<img src="./public/coats_icon_header.png" alt="CoATS" width="48" />
-<br/>
-<sub>CoATS V2 — Built with precision, secured by design.</sub>
-</div>

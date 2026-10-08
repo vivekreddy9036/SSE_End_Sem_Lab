@@ -11,13 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "CoATS - Cases of Anti Terrorism Squad",
-  description: "Case Management System for Anti Terrorism Squad",
-  icons: {
-    icon: "/coats_favicon.png",
-    apple: "/coats_favicon.png",
-    shortcut: "/coats_favicon.png",
-  },
+  title: "SentinelIAM — Identity & Access Management",
+  description: "Identity and Access Management platform: users, roles, permissions, and access requests.",
 };
 
 export default function RootLayout({

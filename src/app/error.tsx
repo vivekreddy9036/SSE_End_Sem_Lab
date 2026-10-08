@@ -21,7 +21,7 @@ export default function RootError({
       </div>
       <h1 className="text-lg font-semibold text-foreground">Something went wrong</h1>
       <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-        CoATS ran into an unexpected error. Please try again.
+        SentinelIAM ran into an unexpected error. Please try again.
       </p>
       <button
         onClick={reset}
