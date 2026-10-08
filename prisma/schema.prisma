@@ -1,0 +1,242 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ──────────────────────────────────────────────────
+// Lookup Tables
+// ──────────────────────────────────────────────────
+
+model Branch {
+  id             Int      @id @default(autoincrement())
+  code           String   @unique @db.VarChar(10)
+  name           String   @db.VarChar(100)
+  isHeadquarters Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  users User[]
+  cases Case[]
+
+  @@map("branches")
+}
+
+model Role {
+  id            Int      @id @default(autoincrement())
+  code          String   @unique @db.VarChar(20)
+  name          String   @db.VarChar(100)
+  isSupervisory Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  users User[]
+
+  @@map("roles")
+}
+
+model CaseStage {
+  id   Int    @id @default(autoincrement())
+  code String @unique @db.VarChar(20)
+  name String @db.VarChar(100)
+
+  cases Case[]
+
+  @@map("case_stages")
+}
+
+// ──────────────────────────────────────────────────
+// Users
+// ──────────────────────────────────────────────────
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique @db.VarChar(100)
+  passwordHash String    @map("password_hash")
+  fullName     String    @db.VarChar(150)
+  roleId       Int       @map("role_id")
+  branchId     Int       @map("branch_id")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastLogin    DateTime? @map("last_login")
+  lastLoginIp       String?   @map("last_login_ip") @db.VarChar(45)
+  lastLoginLocation String?   @map("last_login_location") @db.VarChar(200)
+  lastLoginLat      Float?    @map("last_login_lat") @db.DoublePrecision
+  lastLoginLng      Float?    @map("last_login_lng") @db.DoublePrecision
+  lastLoginAddress  String?   @map("last_login_address")
+  lastLoginPincode  String?   @map("last_login_pincode") @db.VarChar(20)
+  lastLoginCity     String?   @map("last_login_city") @db.VarChar(100)
+  lastLoginState    String?   @map("last_login_state") @db.VarChar(100)
+  lastLoginCountry  String?   @map("last_login_country") @db.VarChar(100)
+  lastLoginSource   String?   @map("last_login_source") @db.VarChar(10) // "gps" | "ip"
+
+  // ── Two-Factor Authentication ──
+  totpEnabled      Boolean   @default(false) @map("totp_enabled")
+  totpSecret       String?   @map("totp_secret")       // AES-256-GCM encrypted
+  totpBackupCodes  String?   @map("totp_backup_codes")  // JSON array of bcrypt hashes
+  totpFailedCount  Int       @default(0) @map("totp_failed_count")
+  totpLockedUntil  DateTime? @map("totp_locked_until")
+
+  // ── Passkey (WebAuthn) Authentication ──
+  passkeyEnabled        Boolean   @default(false) @map("passkey_enabled")
+  webauthnChallenge     String?   @map("webauthn_challenge")        // active challenge (base64url)
+  webauthnChallengeExp  DateTime? @map("webauthn_challenge_exp")    // expiry for the challenge
+
+  role   Role   @relation(fields: [roleId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  assignedCases   Case[]         @relation("AssignedOfficer")
+  createdCases    Case[]         @relation("CaseCreator")
+  createdActions  CaseAction[]
+  progressEntries CaseProgress[]
+  uploadedFiles   CaseFile[]
+  auditLogs       AuditLog[]
+  passkeys        Passkey[]
+
+  @@index([roleId])
+  @@index([branchId])
+  @@map("users")
+}
+
+// ──────────────────────────────────────────────────
+// Passkeys (WebAuthn)
+// ──────────────────────────────────────────────────
+
+model Passkey {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  credentialId String   @unique @map("credential_id")   // base64url-encoded credential ID
+  publicKey    Bytes    @map("public_key")               // COSE public key
+  counter      BigInt   @default(0)
+  deviceType   String   @map("device_type") @db.VarChar(20) // "singleDevice" | "multiDevice"
+  backedUp     Boolean  @default(false)
+  transports   String?                                    // JSON array: ["internal","usb","ble","nfc"]
+  friendlyName String?  @map("friendly_name") @db.VarChar(100)
+  createdAt    DateTime @default(now()) @map("created_at")
+  lastUsedAt   DateTime? @map("last_used_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("passkeys")
+}
+
+// ──────────────────────────────────────────────────
+// Audit Log
+// ──────────────────────────────────────────────────
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  action    String   @db.VarChar(50)
+  detail    String?
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ──────────────────────────────────────────────────
+// Case Management
+// ──────────────────────────────────────────────────
+
+model Case {
+  id                 Int      @id @default(autoincrement())
+  uid                String   @unique @db.VarChar(50)
+  psLimit            String   @map("ps_limit") @db.VarChar(150)
+  crimeNumber        String   @map("crime_number") @db.VarChar(100)
+  sectionOfLaw       String   @map("section_of_law")
+  dateOfOccurrence   DateTime @map("date_of_occurrence") @db.Date
+  dateOfRegistration DateTime @map("date_of_registration") @db.Date
+  complainantName    String   @map("complainant_name") @db.VarChar(150)
+  accusedDetails     String   @map("accused_details")
+  gist               String
+  stageId            Int      @map("stage_id")
+  assignedOfficerId  Int      @map("assigned_officer_id")
+  branchId           Int      @map("branch_id")
+  isActive           Boolean  @default(true) @map("is_active")
+  createdById        Int      @map("created_by_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  blockchainTxId     String?  @map("blockchain_tx_id")  // Hyperledger Fabric TX ID
+
+  stage           CaseStage @relation(fields: [stageId], references: [id])
+  assignedOfficer User      @relation("AssignedOfficer", fields: [assignedOfficerId], references: [id])
+  branch          Branch    @relation(fields: [branchId], references: [id])
+  createdBy       User      @relation("CaseCreator", fields: [createdById], references: [id])
+
+  actions         CaseAction[]
+  progressEntries CaseProgress[]
+  files           CaseFile[]
+
+  @@unique([crimeNumber, branchId])
+  @@index([stageId])
+  @@index([assignedOfficerId])
+  @@index([branchId])
+  @@index([isActive])
+  @@map("cases")
+}
+
+model CaseFile {
+  id          Int      @id @default(autoincrement())
+  caseId      Int      @map("case_id")
+  r2Key       String   @unique @map("r2_key")       // e.g. cases/42/1710000000_report.pdf
+  fileName    String   @map("file_name") @db.VarChar(255)
+  contentType String   @map("content_type") @db.VarChar(100)
+  sizeBytes   Int      @map("size_bytes")
+  uploadedById Int     @map("uploaded_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  case       Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  uploadedBy User @relation(fields: [uploadedById], references: [id])
+
+  @@index([caseId])
+  @@map("case_files")
+}
+
+model CaseAction {
+  id          Int       @id @default(autoincrement())
+  caseId      Int       @map("case_id")
+  description String
+  isCompleted Boolean   @default(false) @map("is_completed")
+  createdById Int       @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+
+  case      Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  blockchainTxId  String?  @map("blockchain_tx_id")  // Hyperledger Fabric TX ID
+
+  @@index([caseId])
+  @@index([isCompleted])
+  @@map("case_actions")
+}
+
+model CaseProgress {
+  id              Int       @id @default(autoincrement())
+  caseId          Int       @map("case_id")
+  progressDate    DateTime  @map("progress_date") @db.Date
+  progressDetails String    @map("progress_details")
+  reminderDate    DateTime? @map("reminder_date") @db.Date
+  furtherAction   String?   @map("further_action")
+  remarks         String?
+  createdById     Int       @map("created_by_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  case      Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  blockchainTxId  String?  @map("blockchain_tx_id")  // Hyperledger Fabric TX ID
+
+  @@index([caseId])
+  @@index([progressDate])
+  @@map("case_progress")
+}

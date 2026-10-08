@@ -1,0 +1,170 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# CoATS Fabric Network — Orderer, Peer, CouchDB
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Production configuration:
+#   • TLS enabled on all components
+#   • CouchDB for rich queries (not exposed to host — Docker network only)
+#   • Raft single-orderer (scalable to 3+ for HA)
+#   • Channel Participation API (no system channel)
+#   • Resource limits on all containers
+#   • JSON logging with rotation
+#   • Prometheus metrics endpoints
+#
+# Exposed ports (controlled by GCP firewall):
+#   • 7050 — Orderer gRPC (for consensus, internal)
+#   • 7051 — Peer gRPC (for Next.js app blockchain queries)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+networks:
+  coats-network:
+    name: coats-fabric-network
+
+volumes:
+  orderer.coats.gov.in:
+  peer0.coats.gov.in:
+  couchdb0.data:
+
+services:
+
+  # ─── Raft Orderer ─────────────────────────────────────────────────────────
+  orderer.coats.gov.in:
+    image: hyperledger/fabric-orderer:${FABRIC_VERSION:-2.5}
+    container_name: orderer.coats.gov.in
+    hostname: orderer.coats.gov.in
+    restart: unless-stopped
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=7050
+      - ORDERER_GENERAL_LOCALMSPID=${ORDERER_MSP:-OrdererMSP}
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      # ── TLS ──
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      # ── Cluster (Raft) ──
+      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      # ── Channel Participation API (Fabric 2.3+) ──
+      - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+      - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+      # ── Admin TLS (for osnadmin CLI) ──
+      - ORDERER_ADMIN_TLS_ENABLED=true
+      - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
+      # ── Metrics ──
+      - ORDERER_OPERATIONS_LISTENADDRESS=orderer.coats.gov.in:9443
+      - ORDERER_METRICS_PROVIDER=prometheus
+    working_dir: /root
+    command: orderer
+    ports:
+      - "${ORDERER_PORT:-7050}:7050"
+      - "127.0.0.1:${ORDERER_ADMIN_PORT:-7053}:7053"
+      - "127.0.0.1:9443:9443"
+    volumes:
+      - ./organizations/ordererOrg/orderers/orderer.coats.gov.in/msp:/var/hyperledger/orderer/msp
+      - ./organizations/ordererOrg/orderers/orderer.coats.gov.in/tls:/var/hyperledger/orderer/tls
+      - orderer.coats.gov.in:/var/hyperledger/production/orderer
+    networks:
+      - coats-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "5"
+
+  # ─── CouchDB (State Database for Peer0) ──────────────────────────────────
+  # NOT exposed to host — accessible only via Docker network.
+  couchdb0:
+    image: couchdb:3.3
+    container_name: couchdb0.coats.gov.in
+    hostname: couchdb0.coats.gov.in
+    restart: unless-stopped
+    environment:
+      - COUCHDB_USER=${COUCHDB_USER:-coats_statedb}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+    volumes:
+      - couchdb0.data:/opt/couchdb/data
+    networks:
+      - coats-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ─── Peer0 (CoATS Organization) ──────────────────────────────────────────
+  peer0.coats.gov.in:
+    image: hyperledger/fabric-peer:${FABRIC_VERSION:-2.5}
+    container_name: peer0.coats.gov.in
+    hostname: peer0.coats.gov.in
+    restart: unless-stopped
+    depends_on:
+      - couchdb0
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      # ── Docker for Chaincode Containers ──
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=coats-fabric-network
+      # ── Peer Identity ──
+      - CORE_PEER_ID=peer0.coats.gov.in
+      - CORE_PEER_ADDRESS=peer0.coats.gov.in:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.coats.gov.in:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.coats.gov.in:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.coats.gov.in:7051
+      - CORE_PEER_LOCALMSPID=${COATS_MSP:-CoATSMSP}
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      # ── TLS ──
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      # ── CouchDB ──
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb0.coats.gov.in:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=${COUCHDB_USER:-coats_statedb}
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=${COUCHDB_PASSWORD}
+      # ── Metrics ──
+      - CORE_OPERATIONS_LISTENADDRESS=peer0.coats.gov.in:9444
+      - CORE_METRICS_PROVIDER=prometheus
+    working_dir: /root
+    command: peer node start
+    ports:
+      - "${PEER0_PORT:-7051}:7051"
+      - "127.0.0.1:${PEER0_CHAINCODE_PORT:-7052}:7052"
+      - "127.0.0.1:9444:9444"
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./organizations/coatsOrg/peers/peer0.coats.gov.in/msp:/etc/hyperledger/fabric/msp
+      - ./organizations/coatsOrg/peers/peer0.coats.gov.in/tls:/etc/hyperledger/fabric/tls
+      - peer0.coats.gov.in:/var/hyperledger/production
+    networks:
+      - coats-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '2.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "5"

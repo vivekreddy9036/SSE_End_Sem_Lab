@@ -1,0 +1,93 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# CoATS Fabric Network — Certificate Authorities
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Two Fabric CAs:
+#   1. ca.orderer  — issues certs for the ordering service
+#   2. ca.coats    — issues certs for CoATS org (peers, admins, clients)
+#
+# CA ports are bound to 127.0.0.1 — only accessible from the VM itself.
+# After initial enrollment, CAs only need to run for re-enrollment/revocation.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+networks:
+  coats-network:
+    name: coats-fabric-network
+
+services:
+
+  # ─── Orderer Organization CA ──────────────────────────────────────────────
+  ca.orderer:
+    image: hyperledger/fabric-ca:${FABRIC_CA_VERSION:-1.5}
+    container_name: ca.orderer.coats.gov.in
+    hostname: ca.orderer.coats.gov.in
+    restart: unless-stopped
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-orderer
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=7054
+      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:17054
+      - FABRIC_CA_SERVER_CSR_HOSTS=ca.orderer.coats.gov.in,localhost,127.0.0.1
+    ports:
+      - "127.0.0.1:${CA_ORDERER_PORT:-7054}:7054"
+      - "127.0.0.1:17054:17054"
+    command: sh -c 'fabric-ca-server start -b ${CA_ORDERER_ADMIN_USER}:${CA_ORDERER_ADMIN_PASSWORD} -d'
+    volumes:
+      - ./organizations/fabric-ca/ordererOrg:/etc/hyperledger/fabric-ca-server
+    networks:
+      - coats-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "fabric-ca-client", "getcainfo", "-u", "https://localhost:7054", "--tls.certfiles", "/etc/hyperledger/fabric-ca-server/tls-cert.pem"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ─── CoATS Organization CA ───────────────────────────────────────────────
+  ca.coats:
+    image: hyperledger/fabric-ca:${FABRIC_CA_VERSION:-1.5}
+    container_name: ca.coats.gov.in
+    hostname: ca.coats.gov.in
+    restart: unless-stopped
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-coats
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=8054
+      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:18054
+      - FABRIC_CA_SERVER_CSR_HOSTS=ca.coats.gov.in,localhost,127.0.0.1
+    ports:
+      - "127.0.0.1:${CA_COATS_PORT:-8054}:8054"
+      - "127.0.0.1:18054:18054"
+    command: sh -c 'fabric-ca-server start -b ${CA_COATS_ADMIN_USER}:${CA_COATS_ADMIN_PASSWORD} -d'
+    volumes:
+      - ./organizations/fabric-ca/coatsOrg:/etc/hyperledger/fabric-ca-server
+    networks:
+      - coats-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "fabric-ca-client", "getcainfo", "-u", "https://localhost:8054", "--tls.certfiles", "/etc/hyperledger/fabric-ca-server/tls-cert.pem"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

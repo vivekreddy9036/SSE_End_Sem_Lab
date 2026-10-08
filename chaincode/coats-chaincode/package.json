@@ -1,0 +1,17 @@
+{
+  "name": "coats-chaincode",
+  "version": "1.0.0",
+  "description": "Hyperledger Fabric chaincode for CoATS — Complaint Administration & Tracking System",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "fabric-chaincode-node start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "fabric-contract-api": "^2.5.0",
+    "fabric-shim": "^2.5.0"
+  }
+}

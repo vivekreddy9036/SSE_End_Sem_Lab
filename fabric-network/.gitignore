@@ -1,0 +1,17 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Generated crypto material — NEVER commit to version control
+# ═══════════════════════════════════════════════════════════════════════════
+organizations/
+channel-artifacts/
+.env
+
+# Fabric CA server data
+fabric-ca/
+
+# Chaincode packages
+*.tar.gz
+*.tgz
+
+# Fabric binaries (downloaded during setup)
+bin/
+config/

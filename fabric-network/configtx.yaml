@@ -1,0 +1,150 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# CoATS Hyperledger Fabric — Channel Configuration (configtx.yaml)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Used with configtxgen to produce the channel genesis block.
+# Fabric 2.5 — Channel Participation API (no system channel).
+#
+# Usage:
+#   export FABRIC_CFG_PATH=${PWD}
+#   configtxgen -profile CoATSChannel -outputBlock ./channel-artifacts/coats-channel.block \
+#               -channelID coats-channel
+# ═══════════════════════════════════════════════════════════════════════════════
+
+---
+Organizations:
+
+  - &OrdererOrg
+    Name: OrdererOrg
+    ID: OrdererMSP
+    MSPDir: ./organizations/ordererOrg/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer.coats.gov.in:7050
+
+  - &CoATSOrg
+    Name: CoATSOrg
+    ID: CoATSMSP
+    MSPDir: ./organizations/coatsOrg/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('CoATSMSP.admin', 'CoATSMSP.peer', 'CoATSMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('CoATSMSP.admin', 'CoATSMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('CoATSMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('CoATSMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.coats.gov.in
+        Port: 7051
+
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_0: true
+
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer.coats.gov.in:7050
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.coats.gov.in
+        Port: 7050
+        ClientTLSCert: ./organizations/ordererOrg/orderers/orderer.coats.gov.in/tls/server.crt
+        ServerTLSCert: ./organizations/ordererOrg/orderers/orderer.coats.gov.in/tls/server.crt
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Profiles
+# ═══════════════════════════════════════════════════════════════════════════════
+
+Profiles:
+
+  CoATSChannel:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *CoATSOrg
