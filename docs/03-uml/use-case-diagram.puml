@@ -1,0 +1,52 @@
+@startuml SentinelIAM-UseCases
+left to right direction
+skinparam packageStyle rect
+
+actor "Standard User" as User
+actor "Approver" as Approver
+actor "Administrator" as Admin
+actor "Auditor" as Auditor
+
+Approver --|> User
+Admin --|> User
+
+rectangle "SentinelIAM" {
+  usecase "Register Account" as UC1
+  usecase "Login" as UC2
+  usecase "Verify 2FA (TOTP/Passkey)" as UC2a
+  usecase "Set Up 2FA" as UC2b
+  usecase "Reset Password" as UC3
+  usecase "Submit Access Request" as UC4
+  usecase "Review Access Request" as UC5
+  usecase "Approve Access Request" as UC5a
+  usecase "Reject Access Request" as UC5b
+  usecase "Check Approval Authority" as UC5c
+  usecase "Assign Role to User" as UC6
+  usecase "Define Role/Permission/Resource" as UC7
+  usecase "Deactivate/Reactivate Account" as UC8
+  usecase "View Audit Log" as UC9
+  usecase "Account Lockout" as UC10
+
+  User --> UC1
+  User --> UC2
+  User --> UC3
+  User --> UC4
+
+  UC2 .> UC2a : <<include>>
+  UC2 .> UC2b : <<extend>>\n(first login, no 2FA set up)
+  UC2 .> UC10 : <<extend>>\n(5 failed attempts)
+
+  Approver --> UC5
+  UC5 .> UC5a : <<extend>>
+  UC5 .> UC5b : <<extend>>
+  UC5 .> UC5c : <<include>>
+
+  Admin --> UC6
+  Admin --> UC7
+  Admin --> UC8
+  Admin --> UC9
+  UC6 .> UC5c : <<include>>\n(privilege-escalation guard)
+
+  Auditor --> UC9
+}
+@enduml

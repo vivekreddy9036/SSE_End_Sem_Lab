@@ -1,0 +1,38 @@
+flowchart TD
+    ROOT["ROOT GOAL:\nObtain PAYROLL_WRITE access\nwithout legitimate authorization\n(OR)"]
+
+    ROOT --> A["Path A: Compromise an account\nthat already holds PAYROLL_WRITE\nor PAYROLL_APPROVE (OR)"]
+    ROOT --> B["Path B: Exploit a flawed\nauthorization check (OR)"]
+    ROOT --> C["Path C: Abuse the legitimate\naccess-request workflow (OR)"]
+    ROOT --> D["Path D: Compromise infrastructure\ndirectly (OR)"]
+
+    A --> A1["A1: Credential stuffing\n/ brute-force login (AND:\nvalid email + guessable password\nwithin lockout threshold)"]
+    A --> A2["A2: Real-time phishing relay\n(password + TOTP code) (AND:\nconvincing lure + victim acts\nwithin 30s TOTP window)"]
+    A --> A3["A3: Steal session cookie\nvia XSS (AND: find XSS vector\n+ cookie readable by JS)"]
+    A --> A4["A4: Steal refresh token\nfrom browser storage\n(AND: physical/malware access\nto victim device)"]
+
+    B --> B1["B1: Call role-assignment endpoint\ndirectly, bypass UI self-check\n(AND: find endpoint + no\nlive server-side re-verification)"]
+    B --> B2["B2: Approve own access request\n(AND: already hold an unrelated\nAPPROVE permission on same\nresource + no requester!=reviewer check)"]
+    B --> B3["B3: Forge JWT permissions claim\n(AND: obtain JWT_SECRET)"]
+
+    C --> C1["C1: Submit request, then\nsocial-engineer a legitimate\napprover into approving it"]
+    C --> C2["C2: Race condition — submit\nmany requests hoping one slips\nthrough before a role/permission\nchange revokes approver authority"]
+
+    D --> D1["D1: Exfiltrate .env / DATABASE_URL\nfrom server or CI secrets store"]
+    D --> D2["D2: Directly write to\nuser_permissions table\nvia leaked DB credentials"]
+
+    classDef blocked fill:#d4edda,stroke:#28a745,color:#155724;
+    classDef partial fill:#fff3cd,stroke:#ffc107,color:#856404;
+    classDef open fill:#f8d7da,stroke:#dc3545,color:#721c24;
+
+    class A1 blocked
+    class A2 partial
+    class A3 blocked
+    class A4 partial
+    class B1 blocked
+    class B2 blocked
+    class B3 partial
+    class C1 partial
+    class C2 blocked
+    class D1 partial
+    class D2 partial

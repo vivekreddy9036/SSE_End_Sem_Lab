@@ -1,0 +1,93 @@
+erDiagram
+    ROLE {
+        int id PK
+        string code
+        string name
+        string description
+        boolean isSystem
+    }
+    RESOURCE {
+        int id PK
+        string code
+        string name
+        string sensitivity
+    }
+    PERMISSION {
+        int id PK
+        string code
+        string name
+        string action
+        int resourceId FK
+    }
+    ROLE_PERMISSION {
+        int id PK
+        int roleId FK
+        int permissionId FK
+        int grantedById FK
+        datetime grantedAt
+    }
+    USER_PERMISSION {
+        int id PK
+        int userId FK
+        int permissionId FK
+        int grantedById FK
+        datetime expiresAt
+        int sourceAccessRequestId FK
+    }
+    ACCESS_REQUEST {
+        int id PK
+        int requesterId FK
+        int permissionId FK
+        string justification
+        string status
+        int reviewedById FK
+        datetime reviewedAt
+    }
+    USER {
+        int id PK
+        string email
+        string passwordHash
+        string fullName
+        int roleId FK
+        boolean isActive
+        int failedLoginCount
+        datetime lockedUntil
+        boolean totpEnabled
+        boolean passkeyEnabled
+    }
+    PASSKEY {
+        int id PK
+        int userId FK
+        string credentialId
+        bytes publicKey
+        bigint counter
+    }
+    PASSWORD_RESET_TOKEN {
+        int id PK
+        int userId FK
+        string tokenHash
+        datetime expiresAt
+        datetime usedAt
+    }
+    AUDIT_LOG {
+        int id PK
+        int userId FK
+        string action
+        string detail
+        string ipAddress
+        datetime createdAt
+    }
+
+    ROLE ||--o{ USER : "assigned to"
+    ROLE ||--o{ ROLE_PERMISSION : "grants"
+    RESOURCE ||--o{ PERMISSION : "exposes"
+    PERMISSION ||--o{ ROLE_PERMISSION : "granted via"
+    PERMISSION ||--o{ USER_PERMISSION : "granted via"
+    PERMISSION ||--o{ ACCESS_REQUEST : "requested"
+    USER ||--o{ USER_PERMISSION : "holds (direct)"
+    USER ||--o{ ACCESS_REQUEST : "requests"
+    USER ||--o{ ACCESS_REQUEST : "reviews"
+    USER ||--o{ PASSKEY : "registers"
+    USER ||--o{ PASSWORD_RESET_TOKEN : "requests"
+    USER ||--o{ AUDIT_LOG : "performs"
+    ACCESS_REQUEST ||--o| USER_PERMISSION : "results in"

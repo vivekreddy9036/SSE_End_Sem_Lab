@@ -1,0 +1,64 @@
+flowchart TB
+    subgraph L1["Presentation Layer (React / Next.js App Router)"]
+        AuthPages["Auth Pages\nlogin, register,\nforgot/reset-password,\ntwo-factor"]
+        SelfServicePages["Self-Service Pages\ndashboard, access-requests"]
+        AdminPages["Admin Pages\nusers, roles, permissions,\nresources, approval queue,\naudit log"]
+    end
+
+    subgraph L2["API / Controller Layer (Next.js Route Handlers)"]
+        AuthAPI["/api/auth/*"]
+        AccessReqAPI["/api/access-requests\n/api/admin/access-requests/*"]
+        AdminAPI["/api/admin/users\n/api/admin/roles\n/api/admin/permissions\n/api/admin/resources"]
+        AuditAPI["/api/admin/audit-log"]
+    end
+
+    subgraph L3["Domain / Service Layer (src/lib)"]
+        AuthSvc["auth.ts\nJWT sign/verify, cookies"]
+        AuthzSvc["authz.ts\neffective permissions,\nprivilege-escalation guards,\napproval-authority guard"]
+        TotpSvc["totp.ts + crypto.ts\nTOTP secret encryption,\nrecovery codes, lockout timers"]
+        PasskeySvc["passkey.ts\nWebAuthn ceremonies"]
+        ResetSvc["password-reset.ts\nhashed single-use tokens"]
+        AuditSvc["audit.ts\nasync, non-blocking\naudit writes + geo lookup"]
+        RateLimitSvc["rate-limit.ts\nsliding-window IP limiter"]
+    end
+
+    subgraph L4["Data Access Layer"]
+        Prisma["Prisma Client\n(prisma/schema.prisma)"]
+    end
+
+    subgraph L5["Infrastructure"]
+        DB[("PostgreSQL\n(Neon)")]
+        MW["middleware.ts\n(edge JWT + coarse RBAC gate)"]
+    end
+
+    AuthPages --> AuthAPI
+    SelfServicePages --> AccessReqAPI
+    AdminPages --> AdminAPI
+    AdminPages --> AuditAPI
+
+    MW -.->|"gates every request\nbefore it reaches L2"| AuthAPI
+    MW -.-> AccessReqAPI
+    MW -.-> AdminAPI
+    MW -.-> AuditAPI
+
+    AuthAPI --> AuthSvc
+    AuthAPI --> TotpSvc
+    AuthAPI --> PasskeySvc
+    AuthAPI --> ResetSvc
+    AuthAPI --> RateLimitSvc
+    AccessReqAPI --> AuthzSvc
+    AdminAPI --> AuthzSvc
+    AuditAPI --> AuthzSvc
+
+    AuthSvc --> AuditSvc
+    AuthzSvc --> AuditSvc
+    TotpSvc --> AuditSvc
+
+    AuthSvc --> Prisma
+    AuthzSvc --> Prisma
+    TotpSvc --> Prisma
+    PasskeySvc --> Prisma
+    ResetSvc --> Prisma
+    AuditSvc --> Prisma
+
+    Prisma --> DB

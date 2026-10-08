@@ -44,6 +44,15 @@ export async function POST(
 
   const ip = getClientIpFromRequest(req);
 
+  // A user who already holds APPROVE/MANAGE on a resource (e.g. for one
+  // permission) must not be able to request a *different* permission on
+  // that same resource and then approve their own request — self-approval
+  // is blocked unconditionally, before the resource-ownership check below.
+  if (accessRequest.requesterId === session.userId) {
+    auditLog(session.userId, "ACCESS_APPROVAL_BLOCKED", `Request #${requestId} (self-approval attempt)`, ip);
+    return apiError("Forbidden — you cannot review your own access request", 403);
+  }
+
   // ADMIN bypasses the resource-ownership check (identity admin spans
   // resources), everyone else must hold APPROVE/MANAGE on this permission's
   // specific resource — re-checked live, not from the (possibly stale) JWT.

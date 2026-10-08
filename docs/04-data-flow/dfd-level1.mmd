@@ -1,0 +1,53 @@
+flowchart TB
+    subgraph TB1["Trust Boundary: Public Internet (untrusted)"]
+        User["External Entity: User"]
+        Approver["External Entity: Approver"]
+        Admin["External Entity: Administrator"]
+        Auditor["External Entity: Auditor"]
+        Turnstile["External Entity: Cloudflare Turnstile"]
+    end
+
+    subgraph TB2["Trust Boundary: Edge Middleware (src/middleware.ts) — coarse, token-based gate"]
+        MW(("1.0\nVerify JWT + coarse\nrole/permission gate"))
+    end
+
+    subgraph TB3["Trust Boundary: Application Server (Next.js API routes)"]
+        P1(("2.0\nAuthentication\n(register, login, 2FA,\npassword reset)"))
+        P2(("3.0\nAccess Request\nWorkflow"))
+        P3(("4.0\nIdentity Administration\n(users, roles,\npermissions, resources)"))
+        P4(("5.0\nAudit Logging"))
+    end
+
+    subgraph TB4["Trust Boundary: Database (Neon Postgres)"]
+        DS_USERS[("D1: users, passkeys,\npassword_reset_tokens")]
+        DS_RBAC[("D2: roles, resources,\npermissions,\nrole_permissions,\nuser_permissions")]
+        DS_REQ[("D3: access_requests")]
+        DS_AUDIT[("D4: audit_logs")]
+    end
+
+    User -- "credentials, CAPTCHA token" --> MW
+    MW -- "CAPTCHA token" --> Turnstile
+    Turnstile -- "verdict" --> MW
+    MW -- "verified request" --> P1
+    P1 -- "read/write" --> DS_USERS
+    P1 -- "login/lockout/reset events" --> P4
+    P4 -- "append-only write" --> DS_AUDIT
+
+    User -- "access request" --> MW
+    MW --> P2
+    Approver -- "approve/reject" --> MW
+    P2 -- "read permission catalog" --> DS_RBAC
+    P2 -- "read/write" --> DS_REQ
+    P2 -- "on approval: write grant" --> DS_RBAC
+    P2 -- "request/decision events" --> P4
+
+    Admin -- "manage users/roles/\npermissions/resources" --> MW
+    MW --> P3
+    P3 -- "read/write" --> DS_RBAC
+    P3 -- "read/write isActive" --> DS_USERS
+    P3 -- "admin action events" --> P4
+
+    Auditor -- "read-only query" --> MW
+    MW -- "requires AUDIT_LOG_READ" --> P4
+    P4 -- "read" --> DS_AUDIT
+    P4 -- "audit entries" --> Auditor

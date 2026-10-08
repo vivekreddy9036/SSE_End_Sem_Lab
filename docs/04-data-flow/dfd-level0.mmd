@@ -1,0 +1,23 @@
+flowchart LR
+    subgraph TB1["Trust Boundary 1: Public Internet (untrusted)"]
+        U["External Entity:\nUser / Browser"]
+        TS["External Entity:\nCloudflare Turnstile\n(CAPTCHA verification)"]
+        GEO["External Entity:\nipapi.co / Nominatim\n(IP & reverse geolocation)"]
+    end
+
+    subgraph TB2["Trust Boundary 2: SentinelIAM Application Server"]
+        P0(("Process 0:\nSentinelIAM IAM Platform"))
+    end
+
+    subgraph TB3["Trust Boundary 3: Database (Neon Postgres, private network)"]
+        DS1[("Data Store:\nAll application data\n(users, roles, permissions,\naccess requests, audit log)")]
+    end
+
+    U -- "credentials, requests,\naccess-request forms" --> P0
+    P0 -- "pages, session cookies,\nAPI responses" --> U
+    P0 -- "CAPTCHA token" --> TS
+    TS -- "pass/fail verdict" --> P0
+    P0 -- "IP address" --> GEO
+    GEO -- "approximate location" --> P0
+    P0 -- "reads/writes" --> DS1
+    DS1 -- "query results" --> P0
