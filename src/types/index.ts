@@ -2,8 +2,15 @@
 // API Request / Response Types
 // ──────────────────────────────────────────────────
 
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  fullName: string;
+  turnstileToken: string;
+}
+
 export interface LoginRequest {
-  username: string;
+  email: string;
   password: string;
   turnstileToken: string;
   lat?: number;
@@ -22,72 +29,55 @@ export interface TwoFactorVerifyRequest {
   recoveryCode?: string;
 }
 
-export interface CreateCaseRequest {
-  psLimit: string;
-  crimeNumber: string;
-  sectionOfLaw: string;
-  dateOfOccurrence: string;
-  dateOfRegistration: string;
-  complainantName: string;
-  accusedDetails: string;
-  gist: string;
-  stageId: number;
-  assignedOfficerId: number;
-  branchId: number;
-  actions: string[]; // initial "Action To Be Taken" items
+export interface ForgotPasswordRequest {
+  email: string;
+  turnstileToken: string;
 }
 
-export interface UpdateCaseRequest {
-  psLimit?: string;
-  sectionOfLaw?: string;
-  complainantName?: string;
-  accusedDetails?: string;
-  gist?: string;
-  stageId?: number;
-  assignedOfficerId?: number;
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
 }
 
-export interface CreateProgressRequest {
-  progressDate: string;
-  progressDetails: string;
-  reminderDate?: string;
-  furtherAction?: string;
-  remarks?: string;
-  completedActionIds?: number[]; // actions marked as done
+export interface AssignRoleRequest {
+  roleId: number;
 }
 
-// ──────────────────────────────────────────────────
-// Dashboard Types
-// ──────────────────────────────────────────────────
-
-export interface StageSummary {
-  stageCode: string;
-  stageName: string;
-  count: number;
+export interface CreateAccessRequestRequest {
+  permissionId: number;
+  justification: string;
 }
 
-export interface BranchStageSummary {
-  branchCode: string;
-  branchName: string;
-  stages: StageSummary[];
-  total: number;
+export interface ReviewAccessRequestRequest {
+  decision: "APPROVED" | "REJECTED";
+  reviewNote?: string;
+  /** Minutes until the grant expires; omit for a permanent grant. */
+  expiresInMinutes?: number;
 }
 
-export interface DashboardData {
-  branches: BranchStageSummary[];
-  totalCases: number;
-  progressEntries?: ProgressEntry[];
+export interface CreateRoleRequest {
+  code: string;
+  name: string;
+  description?: string;
 }
 
-export interface ProgressEntry {
-  id: number;
-  caseUid: string;
-  progressDate: string;
-  progressDetails: string;
-  furtherAction: string | null;
-  remarks: string | null;
-  officerName: string;
-  branchName: string;
+export interface CreateResourceRequest {
+  code: string;
+  name: string;
+  description?: string;
+  sensitivity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+}
+
+export interface CreatePermissionRequest {
+  code: string;
+  name: string;
+  action: "READ" | "WRITE" | "APPROVE" | "MANAGE" | "ADMIN";
+  resourceId: number;
+}
+
+export interface SetRolePermissionRequest {
+  permissionId: number;
+  grant: boolean;
 }
 
 // ──────────────────────────────────────────────────
@@ -96,12 +86,10 @@ export interface ProgressEntry {
 
 export interface SessionUser {
   userId: number;
-  username: string;
+  email: string;
   fullName: string;
   roleCode: string;
-  isSupervisory: boolean;
-  branchId: number;
-  branchCode: string;
+  permissions: string[];
   lastLoginLocation: string | null;
   lastLoginIp: string | null;
   lastLoginLat: number | null;

@@ -13,7 +13,7 @@ import { prisma } from "./prisma";
 
 // ── WebAuthn Relying Party config ─────────────────────
 // RP_ID = your domain (no protocol, no port)
-const RP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "CoATS";
+const RP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "SentinelIAM";
 const RP_ID = process.env.WEBAUTHN_RP_ID || "localhost";
 
 /**
@@ -70,7 +70,7 @@ async function consumeChallenge(userId: number): Promise<string | null> {
 
 // ── Registration (setup) ──────────────────────────────
 
-export async function getRegistrationOptions(userId: number, username: string) {
+export async function getRegistrationOptions(userId: number, email: string) {
   // Fetch existing passkeys so the authenticator doesn't re-register them
   const existingPasskeys = await prisma.passkey.findMany({
     where: { userId },
@@ -87,7 +87,7 @@ export async function getRegistrationOptions(userId: number, username: string) {
   const options = await generateRegistrationOptions({
     rpName: RP_NAME,
     rpID: RP_ID,
-    userName: username,
+    userName: email,
     attestationType: "none", // no attestation needed for passkeys
     excludeCredentials,
     authenticatorSelection: {

@@ -2,8 +2,11 @@ import { after } from "next/server";
 import { prisma } from "./prisma";
 
 export type AuditAction =
+  | "USER_REGISTERED"
   | "LOGIN_SUCCESS"
   | "LOGIN_FAILED"
+  | "LOGIN_LOCKED"
+  | "LOGOUT"
   | "TOTP_SETUP_STARTED"
   | "TOTP_SETUP_COMPLETED"
   | "TOTP_VERIFY_SUCCESS"
@@ -14,8 +17,19 @@ export type AuditAction =
   | "PASSKEY_REGISTERED"
   | "PASSKEY_AUTH_SUCCESS"
   | "PASSKEY_AUTH_FAILED"
-  | "LOGOUT"
-  | "CASE_REASSIGNED";
+  | "PASSWORD_RESET_REQUESTED"
+  | "PASSWORD_RESET_COMPLETED"
+  | "PASSWORD_RESET_FAILED"
+  | "ROLE_ASSIGNED"
+  | "ROLE_ASSIGNMENT_BLOCKED"
+  | "PERMISSION_GRANTED"
+  | "PERMISSION_REVOKED"
+  | "ACCESS_REQUESTED"
+  | "ACCESS_APPROVED"
+  | "ACCESS_REJECTED"
+  | "ACCESS_APPROVAL_BLOCKED"
+  | "ACCOUNT_DEACTIVATED"
+  | "ACCOUNT_REACTIVATED";
 
 /**
  * Write an audit log entry. Never blocks the response — the insert runs via
@@ -88,7 +102,7 @@ async function reverseGeocodeNominatim(lat: number, lng: number): Promise<Struct
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=16&addressdetails=1`,
       {
-        headers: { "User-Agent": "CoATS/2.0 location-lookup" },
+        headers: { "User-Agent": "SentinelIAM/1.0 location-lookup" },
         signal: AbortSignal.timeout(4000),
       }
     );
@@ -224,7 +238,7 @@ export async function lookupIpLocation(ip: string): Promise<LoginGeoResult> {
 
   try {
     const res = await fetch(`https://ipapi.co/${ip}/json/`, {
-      headers: { "User-Agent": "CoATS/2.0" },
+      headers: { "User-Agent": "SentinelIAM/1.0" },
       signal: AbortSignal.timeout(4000),
     });
     if (res.ok) {

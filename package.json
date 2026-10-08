@@ -1,5 +1,5 @@
 {
-  "name": "coats",
+  "name": "sentineliam",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -19,10 +19,6 @@
     "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1007.0",
-    "@aws-sdk/s3-request-presigner": "^3.1007.0",
-    "@grpc/grpc-js": "^1.14.3",
-    "@hyperledger/fabric-gateway": "^1.10.1",
     "@prisma/client": "^6.19.2",
     "@prisma/extension-accelerate": "^3.0.1",
     "@simplewebauthn/browser": "^13.3.0",
@@ -45,7 +41,8 @@
     "react-dom": "19.2.3",
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

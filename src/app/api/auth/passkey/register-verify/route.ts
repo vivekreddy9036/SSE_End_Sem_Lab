@@ -13,6 +13,7 @@ import { requireAuth } from "@/lib/api-auth";
 import { apiSuccess, apiError } from "@/lib/utils";
 import { verifyAndSaveRegistration, getOriginFromRequest } from "@/lib/passkey";
 import { auditLog, getClientIpFromRequest } from "@/lib/audit";
+import { getEffectivePermissions } from "@/lib/authz";
 
 /**
  * POST /api/auth/passkey/register-verify
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
     if (isLoginFlow) {
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { role: true, branch: true },
+        include: { role: true },
       });
 
       if (!user) {
@@ -93,15 +94,15 @@ export async function POST(req: NextRequest) {
         data: { lastLogin: new Date() },
       });
 
+      const permissions = await getEffectivePermissions(user.id);
+
       const jwtPayload = {
         userId: user.id,
-        username: user.username,
+        email: user.email,
         fullName: user.fullName,
         roleId: user.roleId,
         roleCode: user.role.code,
-        isSupervisory: user.role.isSupervisory,
-        branchId: user.branchId,
-        branchCode: user.branch.code,
+        permissions,
       };
 
       const [accessToken, refreshToken] = await Promise.all([
@@ -115,12 +116,10 @@ export async function POST(req: NextRequest) {
         {
           user: {
             userId: user.id,
-            username: user.username,
+            email: user.email,
             fullName: user.fullName,
             roleCode: user.role.code,
-            isSupervisory: user.role.isSupervisory,
-            branchId: user.branchId,
-            branchCode: user.branch.code,
+            permissions,
           },
         },
         "Passkey registered successfully"

@@ -53,10 +53,3 @@ export function paginatedResponse<T>(
   });
 }
 
-// ── Case UID generator ───────────────────────────────────────────────────────
-
-export function generateCaseUid(branchCode: string, sequenceNumber: number): string {
-  const year = new Date().getFullYear();
-  const seq = String(sequenceNumber).padStart(3, "0");
-  return `${branchCode}/${seq}/${year}`;
-}

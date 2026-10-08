@@ -19,7 +19,7 @@ import { getRegistrationOptions } from "@/lib/passkey";
 export async function POST(req: NextRequest) {
   try {
     let userId: number;
-    let username: string;
+    let email: string;
 
     // Try authenticated session first
     const session = await requireAuth(req);
@@ -35,19 +35,19 @@ export async function POST(req: NextRequest) {
       }
       const user = await prisma.user.findUnique({
         where: { id: pending.userId },
-        select: { id: true, username: true, isActive: true },
+        select: { id: true, email: true, isActive: true },
       });
       if (!user || !user.isActive) {
         return apiError("Account not found or deactivated", 401);
       }
       userId = user.id;
-      username = user.username;
+      email = user.email;
     } else {
       userId = session.userId;
-      username = session.username;
+      email = session.email;
     }
 
-    const options = await getRegistrationOptions(userId, username);
+    const options = await getRegistrationOptions(userId, email);
 
     return apiSuccess(options, "Registration options generated");
   } catch (error) {

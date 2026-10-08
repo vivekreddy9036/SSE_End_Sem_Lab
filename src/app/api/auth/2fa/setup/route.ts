@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, username: true, totpEnabled: true, totpSecret: true },
+      select: { id: true, email: true, totpEnabled: true, totpSecret: true },
     });
 
     if (!user) {
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const otpauthUri = generateTotpUri(secret, user.username);
+    const otpauthUri = generateTotpUri(secret, user.email);
     const qrCodeDataUrl = await QRCode.toDataURL(otpauthUri, {
       width: 256,
       margin: 2,

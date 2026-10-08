@@ -11,7 +11,8 @@ import {
 } from "@/lib/auth";
 import { apiSuccess, apiError } from "@/lib/utils";
 import { applyRateLimit, LOGIN_RATE_LIMIT } from "@/lib/rate-limit";
-import { isAccountLocked } from "@/lib/totp";
+import { isAccountLocked, getLockoutExpiry, MAX_FAILED_ATTEMPTS } from "@/lib/totp";
+import { getEffectivePermissions } from "@/lib/authz";
 import { auditLog, getClientIpFromRequest, resolveLoginLocation } from "@/lib/audit";
 import type { LoginRequest } from "@/types";
 
@@ -39,8 +40,8 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json()) as LoginRequest;
 
-    if (!body.username || !body.password) {
-      return apiError("Username and password are required");
+    if (!body.email || !body.password) {
+      return apiError("Email and password are required");
     }
 
     if (!body.turnstileToken) {
@@ -55,26 +56,54 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { username: body.username.toUpperCase().trim() },
-      include: { role: true, branch: true },
+      where: { email: body.email.toLowerCase().trim() },
+      include: { role: true },
     });
 
+    const ip = getClientIpFromRequest(req);
+
+    // Same generic error whether the account doesn't exist or is deactivated —
+    // don't leak which case it is (account enumeration / account-takeover recon).
     if (!user || !user.isActive) {
       return apiError("Invalid credentials", 401);
     }
 
-    const ip = getClientIpFromRequest(req);
+    // ── Password-login lockout (account-takeover mitigation) ──
+    if (isAccountLocked(user.lockedUntil)) {
+      return apiError(
+        "Account temporarily locked due to too many failed attempts. Try again later.",
+        423
+      );
+    }
 
     const valid = await bcrypt.compare(body.password, user.passwordHash);
     if (!valid) {
-      auditLog(user.id, "LOGIN_FAILED", "Invalid password", ip);
+      const failedCount = user.failedLoginCount + 1;
+      const lockingOut = failedCount >= MAX_FAILED_ATTEMPTS;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginCount: lockingOut ? 0 : failedCount,
+          lockedUntil: lockingOut ? getLockoutExpiry() : null,
+        },
+      });
+      auditLog(
+        user.id,
+        lockingOut ? "LOGIN_LOCKED" : "LOGIN_FAILED",
+        lockingOut ? "Account locked after repeated failed logins" : "Invalid password",
+        ip
+      );
       return apiError("Invalid credentials", 401);
+    }
+
+    // Password correct — reset the failed-attempt counter.
+    if (user.failedLoginCount > 0) {
+      await prisma.user.update({ where: { id: user.id }, data: { failedLoginCount: 0 } });
     }
 
     // ── 2FA Flow ──────────────────────────────────────
     // Case 1: 2FA enabled (TOTP or Passkey) → require verification before issuing JWT
     if (user.totpEnabled || user.passkeyEnabled) {
-      // Check if account is locked due to failed OTP attempts
       if (isAccountLocked(user.totpLockedUntil)) {
         return apiError(
           "Account temporarily locked due to too many failed attempts. Try again later.",
@@ -109,7 +138,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ── No 2FA (fallback — should not reach here) ────
-    // Update last login
     const geo = await resolveLoginLocation(ip, browserLat, browserLng);
     await prisma.user.update({
       where: { id: user.id },
@@ -128,15 +156,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const permissions = await getEffectivePermissions(user.id);
+
     const jwtPayload = {
       userId: user.id,
-      username: user.username,
+      email: user.email,
       fullName: user.fullName,
       roleId: user.roleId,
       roleCode: user.role.code,
-      isSupervisory: user.role.isSupervisory,
-      branchId: user.branchId,
-      branchCode: user.branch.code,
+      permissions,
     };
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -144,16 +172,16 @@ export async function POST(req: NextRequest) {
       signRefreshToken(user.id),
     ]);
 
+    auditLog(user.id, "LOGIN_SUCCESS", undefined, ip);
+
     const response = apiSuccess(
       {
         user: {
           userId: user.id,
-          username: user.username,
+          email: user.email,
           fullName: user.fullName,
           roleCode: user.role.code,
-          isSupervisory: user.role.isSupervisory,
-          branchId: user.branchId,
-          branchCode: user.branch.code,
+          permissions,
         },
       },
       "Login successful"

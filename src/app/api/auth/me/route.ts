@@ -25,12 +25,10 @@ export async function GET(req: NextRequest) {
 
   return apiSuccess({
     userId: session.userId,
-    username: session.username,
+    email: session.email,
     fullName: session.fullName,
     roleCode: session.roleCode,
-    isSupervisory: session.isSupervisory,
-    branchId: session.branchId,
-    branchCode: session.branchCode,
+    permissions: session.permissions,
     lastLoginLocation: user?.lastLoginLocation ?? null,
     lastLoginIp: user?.lastLoginIp ?? null,
     lastLoginLat: user?.lastLoginLat ?? null,

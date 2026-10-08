@@ -20,6 +20,7 @@ import {
   getLockoutExpiry,
 } from "@/lib/totp";
 import { auditLog, getClientIpFromRequest, resolveLoginLocation } from "@/lib/audit";
+import { getEffectivePermissions } from "@/lib/authz";
 
 /**
  * POST /api/auth/2fa/verify-setup
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { role: true, branch: true },
+      include: { role: true },
     });
 
     if (!user || !user.totpSecret) {
@@ -128,15 +129,15 @@ export async function POST(req: NextRequest) {
 
     // If this is the login flow, issue full JWT tokens
     if (isLoginFlow) {
+      const permissions = await getEffectivePermissions(user.id);
+
       const jwtPayload = {
         userId: user.id,
-        username: user.username,
+        email: user.email,
         fullName: user.fullName,
         roleId: user.roleId,
         roleCode: user.role.code,
-        isSupervisory: user.role.isSupervisory,
-        branchId: user.branchId,
-        branchCode: user.branch.code,
+        permissions,
       };
 
       const [accessToken, refreshToken] = await Promise.all([
@@ -150,12 +151,10 @@ export async function POST(req: NextRequest) {
         {
           user: {
             userId: user.id,
-            username: user.username,
+            email: user.email,
             fullName: user.fullName,
             roleCode: user.role.code,
-            isSupervisory: user.role.isSupervisory,
-            branchId: user.branchId,
-            branchCode: user.branch.code,
+            permissions,
           },
           recoveryCodes,
         },

@@ -11,11 +11,17 @@ import {
   getRefreshTokenName,
 } from "@/lib/auth";
 import { apiSuccess, apiError } from "@/lib/utils";
+import { getEffectivePermissions } from "@/lib/authz";
 
 /**
  * POST /api/auth/refresh
  * Uses the refresh token cookie to issue a new access + refresh token pair.
  * This is called automatically by the AuthProvider when a 401 is detected.
+ *
+ * Permissions are recomputed from the DB on every refresh (not copied from
+ * the old access token) — this is the main place a revoked permission or
+ * role change actually takes effect, since the 15-minute access token
+ * itself can't be revoked early.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -34,10 +40,9 @@ export async function POST(req: NextRequest) {
       return response;
     }
 
-    // Look up user from DB to get fresh role/branch data
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      include: { role: true, branch: true },
+      include: { role: true },
     });
 
     if (!user || !user.isActive) {
@@ -47,15 +52,15 @@ export async function POST(req: NextRequest) {
       return response;
     }
 
+    const permissions = await getEffectivePermissions(user.id);
+
     const jwtPayload = {
       userId: user.id,
-      username: user.username,
+      email: user.email,
       fullName: user.fullName,
       roleId: user.roleId,
       roleCode: user.role.code,
-      isSupervisory: user.role.isSupervisory,
-      branchId: user.branchId,
-      branchCode: user.branch.code,
+      permissions,
     };
 
     // Rotate both tokens
@@ -68,12 +73,10 @@ export async function POST(req: NextRequest) {
       {
         user: {
           userId: user.id,
-          username: user.username,
+          email: user.email,
           fullName: user.fullName,
           roleCode: user.role.code,
-          isSupervisory: user.role.isSupervisory,
-          branchId: user.branchId,
-          branchCode: user.branch.code,
+          permissions,
           lastLoginLocation: user.lastLoginLocation ?? null,
           lastLoginIp: user.lastLoginIp ?? null,
           lastLoginLat: user.lastLoginLat ?? null,

@@ -17,7 +17,8 @@ interface AuthContextValue {
   user: SessionUser | null;
   loading: boolean;
   twoFactorPending: { required: boolean; totpEnabled: boolean; passkeyEnabled: boolean } | null;
-  login: (username: string, password: string, turnstileToken: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string, turnstileToken: string) => Promise<void>;
+  login: (email: string, password: string, turnstileToken: string) => Promise<void>;
   verify2FA: (token: string) => Promise<{ recoveryCodes?: string[] }>;
   verify2FARecovery: (code: string) => Promise<void>;
   complete2FASetup: (token: string) => Promise<{ recoveryCodes: string[] }>;
@@ -223,7 +224,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchSession, clearRefreshTimer, clearInactivityTimer]);
 
-  const login = async (username: string, password: string, turnstileToken: string) => {
+  const register = async (
+    email: string,
+    password: string,
+    fullName: string,
+    turnstileToken: string
+  ) => {
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, fullName, turnstileToken }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || json.error || "Registration failed");
+    }
+    router.push("/login");
+  };
+
+  const login = async (email: string, password: string, turnstileToken: string) => {
     // Fire the GPS permission prompt immediately but don't block on it —
     // it typically resolves well before the user finishes any 2FA step.
     void ensureCoords();
@@ -232,7 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, turnstileToken, lat: coords?.lat, lng: coords?.lng }),
+      body: JSON.stringify({ email, password, turnstileToken, lat: coords?.lat, lng: coords?.lng }),
     });
 
     const json = await res.json();
@@ -254,7 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(json.data.user);
     startSessionTimers();
-    router.push("/cases");
+    router.push("/dashboard");
   };
 
   /** Verify TOTP code during login */
@@ -275,7 +294,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(json.data.user);
     setTwoFactorPending(null);
     startSessionTimers();
-    router.push("/cases");
+    router.push("/dashboard");
 
     return { recoveryCodes: json.data.recoveryCodes };
   };
@@ -298,7 +317,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(json.data.user);
     setTwoFactorPending(null);
     startSessionTimers();
-    router.push("/cases");
+    router.push("/dashboard");
   };
 
   /** Complete 2FA setup (first-time): verify OTP + enable 2FA */
@@ -386,7 +405,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(json.data.user);
     setTwoFactorPending(null);
     startSessionTimers();
-    router.push("/cases");
+    router.push("/dashboard");
     return {};
   };
 
@@ -404,6 +423,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         twoFactorPending,
+        register,
         login,
         verify2FA,
         verify2FARecovery,

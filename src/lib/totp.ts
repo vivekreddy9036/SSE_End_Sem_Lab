@@ -3,7 +3,7 @@ import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { encrypt, decrypt } from "./crypto";
 
-const TOTP_ISSUER = process.env.NEXT_PUBLIC_APP_NAME || "CoATS";
+const TOTP_ISSUER = process.env.NEXT_PUBLIC_APP_NAME || "SentinelIAM";
 const TOTP_PERIOD = 30; // seconds
 const TOTP_DIGITS = 6;
 const TOTP_ALGORITHM = "SHA1"; // Google Authenticator default
@@ -25,10 +25,10 @@ export function generateTotpSecret(): string {
 /**
  * Create a TOTP instance from a base32 secret.
  */
-function createTotp(secret: string, username: string): TOTP {
+function createTotp(secret: string, label: string): TOTP {
   return new TOTP({
     issuer: TOTP_ISSUER,
-    label: username,
+    label,
     algorithm: TOTP_ALGORITHM,
     digits: TOTP_DIGITS,
     period: TOTP_PERIOD,
@@ -39,8 +39,8 @@ function createTotp(secret: string, username: string): TOTP {
 /**
  * Generate the otpauth:// URI for QR code scanning.
  */
-export function generateTotpUri(secret: string, username: string): string {
-  const totp = createTotp(secret, username);
+export function generateTotpUri(secret: string, email: string): string {
+  const totp = createTotp(secret, email);
   return totp.toString();
 }
 

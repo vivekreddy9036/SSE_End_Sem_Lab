@@ -7,21 +7,20 @@ const JWT_SECRET = new TextEncoder().encode(
 );
 
 // ── Cookie / Token Config ───────────────────────────
-const ACCESS_TOKEN_NAME = "coats_token";
-const REFRESH_TOKEN_NAME = "coats_refresh";
+const ACCESS_TOKEN_NAME = "sentineliam_token";
+const REFRESH_TOKEN_NAME = "sentineliam_refresh";
 const ACCESS_TOKEN_EXPIRY = "15m"; // short-lived
 const REFRESH_TOKEN_EXPIRY = "7d"; // long-lived
 
 // ── JWT Payload ─────────────────────────────────────
 export interface JwtPayload {
   userId: number;
-  username: string;
+  email: string;
   fullName: string;
   roleId: number;
   roleCode: string;
-  isSupervisory: boolean;
-  branchId: number;
-  branchCode: string;
+  /** Effective permission codes: role-granted ∪ direct user grants. */
+  permissions: string[];
 }
 
 export interface RefreshPayload {
@@ -78,7 +77,7 @@ export async function verifyRefreshToken(
 // Issued after password check, valid only for OTP verification (5 min)
 
 const TWO_FA_PENDING_EXPIRY = "5m";
-const TWO_FA_COOKIE_NAME = "coats_2fa_pending";
+const TWO_FA_COOKIE_NAME = "sentineliam_2fa_pending";
 
 export function get2faCookieName(): string {
   return TWO_FA_COOKIE_NAME;

@@ -5,14 +5,20 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "fallback-dev-secret"
 );
 
-const ACCESS_TOKEN_NAME = "coats_token";
+const ACCESS_TOKEN_NAME = "sentineliam_token";
 
 // ── Route definitions ───────────────────────────────
 // Public routes — no auth required
 const PUBLIC_ROUTES = [
   "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
   "/api/auth/login",
+  "/api/auth/register",
   "/api/auth/refresh",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
   "/api/auth/2fa/setup",
   "/api/auth/2fa/verify-setup",
   "/api/auth/2fa/verify",
@@ -23,11 +29,11 @@ const PUBLIC_ROUTES = [
   "/two-factor",
 ];
 
-// Supervisory-only page routes
-const SUPERVISORY_PAGES = ["/all-cases", "/dashboard"];
-
-// Supervisory-only API routes
-const SUPERVISORY_API_PREFIXES = ["/api/dashboard"];
+// Page/API routes reserved for Administrators only. Fine-grained permission
+// checks (e.g. "do you hold PAYROLL_APPROVE") happen server-side in the route
+// handlers via src/lib/authz.ts — this is just a coarse edge-level gate so an
+// unauthenticated or non-admin user never even renders the admin shell.
+const ADMIN_PREFIXES = ["/admin", "/api/admin"];
 
 // ── Middleware ───────────────────────────────────────
 
@@ -56,7 +62,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // 4. Verify access token (Edge-compatible jose)
-  let payload: { userId?: number; isSupervisory?: boolean; roleCode?: string; branchId?: number };
+  let payload: { userId?: number; roleCode?: string; permissions?: string[] };
   try {
     const { payload: verified } = await jwtVerify(token, JWT_SECRET);
     payload = verified as typeof payload;
@@ -65,30 +71,23 @@ export async function middleware(req: NextRequest) {
     return handleUnauthorized(req, pathname);
   }
 
-  // 5. RBAC: Supervisory page access
-  if (SUPERVISORY_PAGES.some((p) => pathname.startsWith(p))) {
-    if (!payload.isSupervisory) {
-      // Redirect non-supervisory users to their cases page
-      return NextResponse.redirect(new URL("/cases", req.url));
+  // 5. RBAC: Admin-only routes
+  if (ADMIN_PREFIXES.some((p) => pathname.startsWith(p))) {
+    if (payload.roleCode !== "ADMIN") {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { success: false, message: "Forbidden — Administrator access required" },
+          { status: 403 }
+        );
+      }
+      return NextResponse.redirect(new URL("/dashboard", req.url));
     }
   }
 
-  // 6. RBAC: Supervisory API access
-  if (SUPERVISORY_API_PREFIXES.some((p) => pathname.startsWith(p))) {
-    if (!payload.isSupervisory) {
-      return NextResponse.json(
-        { success: false, message: "Forbidden — supervisory access required" },
-        { status: 403 }
-      );
-    }
-  }
-
-  // 7. Add user info to request headers (available to API routes)
+  // 6. Add user info to request headers (available to API routes)
   const response = NextResponse.next();
   response.headers.set("x-user-id", String(payload.userId || ""));
   response.headers.set("x-user-role", payload.roleCode || "");
-  response.headers.set("x-user-branch", String(payload.branchId || ""));
-  response.headers.set("x-user-supervisory", payload.isSupervisory ? "true" : "false");
 
   return response;
 }
